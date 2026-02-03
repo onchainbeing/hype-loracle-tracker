@@ -1,0 +1,32 @@
+wallets:
+  - name: "Wallet_1"
+    address: "0x0000000000000000000000000000000000000000"
+    enabled: true
+  - name: "Wallet_2"
+    address: "0x0000000000000000000000000000000000000001"
+    enabled: false
+
+smtp:
+  host: "smtp.gmail.com"
+  port: 465
+  use_tls: false
+  use_ssl: true
+
+notifications:
+  recipients:
+    - "your_email@example.com"
+  daily_summary_time: "09:00"
+  timezone: "Asia/Shanghai"
+
+database:
+  path: "data/tracker.db"
+
+logging:
+  level: "INFO"
+  file: "logs/tracker.log"
+
+hyperliquid:
+  rest_url: "https://api.hyperliquid.xyz"
+  ws_url: "wss://api.hyperliquid.xyz/ws"
+  reconnect_delay: 5
+  max_reconnect_delay: 300

@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Service identifier -->
+    <key>Label</key>
+    <string>com.hype.tracker</string>
+
+    <!-- Program to run -->
+    <key>ProgramArguments</key>
+    <array>
+        <!-- Update this path to your Python installation -->
+        <string>/usr/local/bin/python3</string>
+        <string>-m</string>
+        <string>tracker</string>
+    </array>
+
+    <!-- Working directory - UPDATE THIS PATH -->
+    <key>WorkingDirectory</key>
+    <string>/Users/jerry/Documents/claude/hype_loracle_tracker</string>
+
+    <!-- Environment variables -->
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PYTHONPATH</key>
+        <string>/Users/jerry/Documents/claude/hype_loracle_tracker/src</string>
+    </dict>
+
+    <!-- Start on load (boot) -->
+    <key>RunAtLoad</key>
+    <true/>
+
+    <!-- Keep alive - restart if crashes -->
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+
+    <!-- Throttle restarts -->
+    <key>ThrottleInterval</key>
+    <integer>30</integer>
+
+    <!-- Log files -->
+    <key>StandardOutPath</key>
+    <string>/Users/jerry/Documents/claude/hype_loracle_tracker/logs/launchd.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/jerry/Documents/claude/hype_loracle_tracker/logs/launchd.err.log</string>
+
+    <!-- Nice value (lower priority) -->
+    <key>Nice</key>
+    <integer>10</integer>
+</dict>
+</plist>

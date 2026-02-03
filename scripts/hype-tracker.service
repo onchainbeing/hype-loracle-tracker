@@ -1,0 +1,45 @@
+[Unit]
+Description=Hyperliquid Smart Money Tracker
+Documentation=https://github.com/yourusername/hype_loracle_tracker
+After=network.target network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=tracker
+Group=tracker
+
+# Working directory (adjust to your installation path)
+WorkingDirectory=/opt/hype-tracker
+
+# Run the tracker module
+ExecStart=/opt/hype-tracker/venv/bin/python -m tracker
+
+# Environment
+Environment=PYTHONUNBUFFERED=1
+
+# Restart policy
+Restart=always
+RestartSec=10
+
+# Stop timeout
+TimeoutStopSec=30
+
+# Resource limits (optional, adjust as needed)
+MemoryMax=512M
+CPUQuota=80%
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/hype-tracker/data /opt/hype-tracker/logs
+PrivateTmp=true
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=hype-tracker
+
+[Install]
+WantedBy=multi-user.target
