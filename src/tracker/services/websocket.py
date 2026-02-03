@@ -18,6 +18,7 @@ PING_INTERVAL = 10  # Send ping every 10 seconds
 PING_TIMEOUT = 5    # Wait 5 seconds for pong
 HEALTH_CHECK_INTERVAL = 30  # Application-level health check every 30 seconds
 MAX_SILENCE_SECONDS = 60  # Force reconnect if no message received for 60 seconds
+APP_HEARTBEAT_INTERVAL = 30  # Send application-level ping every 30 seconds to keep connection alive
 
 
 class WebSocketManager:
@@ -40,6 +41,7 @@ class WebSocketManager:
         self._current_delay = reconnect_delay
         self._last_message_time: float = 0  # Track last received message time
         self._health_check_task: Optional[asyncio.Task] = None
+        self._heartbeat_task: Optional[asyncio.Task] = None
 
     async def connect(self) -> None:
         """Establish WebSocket connection."""
@@ -167,6 +169,21 @@ class WebSocketManager:
             except Exception as e:
                 logger.error(f"Error processing fill: {e}")
 
+    async def _heartbeat_loop(self) -> None:
+        """Send periodic heartbeat to keep connection alive."""
+        while self._running:
+            await asyncio.sleep(APP_HEARTBEAT_INTERVAL)
+
+            if not self._running or self._is_ws_closed():
+                continue
+
+            try:
+                # Send Hyperliquid ping message to keep connection alive
+                await self._ws.send(json.dumps({"method": "ping"}))
+                logger.debug("Heartbeat ping sent")
+            except Exception as e:
+                logger.warning(f"Failed to send heartbeat: {e}")
+
     async def _health_check_loop(self) -> None:
         """Monitor connection health and force reconnect if stale."""
         while self._running:
@@ -201,8 +218,9 @@ class WebSocketManager:
         """Main loop - maintain connection and process messages."""
         self._running = True
 
-        # Start health check task
+        # Start background tasks
         self._health_check_task = asyncio.create_task(self._health_check_loop())
+        self._heartbeat_task = asyncio.create_task(self._heartbeat_loop())
 
         while self._running:
             try:
@@ -240,13 +258,14 @@ class WebSocketManager:
         """Stop the WebSocket manager."""
         self._running = False
 
-        # Cancel health check task
-        if self._health_check_task:
-            self._health_check_task.cancel()
-            try:
-                await self._health_check_task
-            except asyncio.CancelledError:
-                pass
+        # Cancel background tasks
+        for task in [self._health_check_task, self._heartbeat_task]:
+            if task:
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
 
         if self._ws and not self._is_ws_closed():
             await self._ws.close()
