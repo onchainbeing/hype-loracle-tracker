@@ -7,16 +7,22 @@ wallets:
     enabled: false
 
 smtp:
+  enabled: false  # Set to true to enable email notifications
   host: "smtp.gmail.com"
   port: 465
   use_tls: false
   use_ssl: true
+
+# PushPlus WeChat notification (token from env var PUSHPLUS_TOKEN)
+pushplus:
+  enabled: true
 
 notifications:
   recipients:
     - "your_email@example.com"
   daily_summary_time: "09:00"
   timezone: "Asia/Shanghai"
+  batch_window_seconds: 300  # Batch notifications for 5 minutes to reduce API calls
 
 database:
   path: "data/tracker.db"

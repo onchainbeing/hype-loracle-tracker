@@ -24,6 +24,7 @@ class SmtpConfig:
     use_ssl: bool = False
     username: str = ""
     password: str = ""
+    enabled: bool = True
 
 
 @dataclass
@@ -33,10 +34,17 @@ class ResendConfig:
 
 
 @dataclass
+class PushPlusConfig:
+    token: str = ""
+    enabled: bool = True
+
+
+@dataclass
 class NotificationConfig:
     recipients: list[str]
     daily_summary_time: str
     timezone: str
+    batch_window_seconds: int = 300  # 5 minutes default
 
 
 @dataclass
@@ -63,6 +71,7 @@ class Config:
     wallets: list[WalletConfig]
     smtp: SmtpConfig
     resend: ResendConfig
+    pushplus: PushPlusConfig
     notifications: NotificationConfig
     database: DatabaseConfig
     logging: LoggingConfig
@@ -123,6 +132,7 @@ def load_config(config_path: Optional[str] = None, env_path: Optional[str] = Non
         use_ssl=smtp_data.get("use_ssl", False),
         username=os.getenv("SMTP_USERNAME", ""),
         password=os.getenv("SMTP_PASSWORD", ""),
+        enabled=smtp_data.get("enabled", True),
     )
 
     # Parse Resend config
@@ -132,12 +142,20 @@ def load_config(config_path: Optional[str] = None, env_path: Optional[str] = Non
         from_email=resend_data.get("from_email", "Hyperliquid Tracker <onboarding@resend.dev>"),
     )
 
+    # Parse PushPlus config
+    pushplus_data = data.get("pushplus", {})
+    pushplus = PushPlusConfig(
+        token=os.getenv("PUSHPLUS_TOKEN", ""),
+        enabled=pushplus_data.get("enabled", True),
+    )
+
     # Parse notification config
     notif_data = data.get("notifications", {})
     notifications = NotificationConfig(
         recipients=notif_data.get("recipients", []),
         daily_summary_time=notif_data.get("daily_summary_time", "09:00"),
         timezone=notif_data.get("timezone", "Asia/Shanghai"),
+        batch_window_seconds=notif_data.get("batch_window_seconds", 300),
     )
 
     # Parse database config
@@ -166,6 +184,7 @@ def load_config(config_path: Optional[str] = None, env_path: Optional[str] = Non
         wallets=wallets,
         smtp=smtp,
         resend=resend,
+        pushplus=pushplus,
         notifications=notifications,
         database=database,
         logging=logging_config,

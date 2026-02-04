@@ -100,11 +100,11 @@ class Application:
         # Save to database
         await self.database.save_position_change(change)
 
-        # Send email notification
+        # Queue notification for batched sending
         try:
-            await self.email_service.send_position_change_alert(change)
+            await self.email_service.queue_position_change_alert(change)
         except Exception as e:
-            logger.error(f"Failed to send position change alert: {e}")
+            logger.error(f"Failed to queue position change alert: {e}")
 
     async def _send_daily_summary(self) -> None:
         """Send daily summary email."""
@@ -125,6 +125,7 @@ class Application:
 
         await self.scheduler.stop()
         await self.ws_manager.stop()
+        await self.email_service.stop()  # Flush pending notifications
         await self.client.close()
         await self.database.close()
 

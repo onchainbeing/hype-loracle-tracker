@@ -9,21 +9,22 @@
     <!-- Program to run -->
     <key>ProgramArguments</key>
     <array>
-        <!-- Update this path to your Python installation -->
-        <string>/usr/local/bin/python3</string>
+        <string>/usr/bin/python3</string>
         <string>-m</string>
         <string>tracker</string>
     </array>
 
-    <!-- Working directory - UPDATE THIS PATH -->
+    <!-- Working directory -->
     <key>WorkingDirectory</key>
-    <string>/Users/jerry/Documents/claude/hype_loracle_tracker</string>
+    <string>/Users/jerry/Applications/hype_loracle_tracker</string>
 
     <!-- Environment variables -->
     <key>EnvironmentVariables</key>
     <dict>
         <key>PYTHONPATH</key>
-        <string>/Users/jerry/Documents/claude/hype_loracle_tracker/src</string>
+        <string>/Users/jerry/Applications/hype_loracle_tracker/src</string>
+        <key>NO_PROXY</key>
+        <string>*</string>
     </dict>
 
     <!-- Start on load (boot) -->
@@ -43,9 +44,9 @@
 
     <!-- Log files -->
     <key>StandardOutPath</key>
-    <string>/Users/jerry/Documents/claude/hype_loracle_tracker/logs/launchd.out.log</string>
+    <string>/Users/jerry/Applications/hype_loracle_tracker/logs/launchd.out.log</string>
     <key>StandardErrorPath</key>
-    <string>/Users/jerry/Documents/claude/hype_loracle_tracker/logs/launchd.err.log</string>
+    <string>/Users/jerry/Applications/hype_loracle_tracker/logs/launchd.err.log</string>
 
     <!-- Nice value (lower priority) -->
     <key>Nice</key>
