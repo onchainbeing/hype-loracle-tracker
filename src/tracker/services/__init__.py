@@ -5,6 +5,8 @@ from .websocket import WebSocketManager
 from .tracker import PositionTracker
 from .email import EmailService
 from .scheduler import Scheduler
+from .analyst import GeminiAnalyst
+from .obsidian import ObsidianWriter
 
 __all__ = [
     "HyperliquidClient",
@@ -12,4 +14,6 @@ __all__ = [
     "PositionTracker",
     "EmailService",
     "Scheduler",
+    "GeminiAnalyst",
+    "ObsidianWriter",
 ]

@@ -67,6 +67,20 @@ class HyperliquidConfig:
 
 
 @dataclass
+class GeminiConfig:
+    api_key: str = ""
+    model: str = "gemini-2.0-flash"
+    enabled: bool = True
+
+
+@dataclass
+class ObsidianConfig:
+    vault_path: str = ""
+    notes_folder: str = "Trading"
+    enabled: bool = True
+
+
+@dataclass
 class Config:
     wallets: list[WalletConfig]
     smtp: SmtpConfig
@@ -76,6 +90,8 @@ class Config:
     database: DatabaseConfig
     logging: LoggingConfig
     hyperliquid: HyperliquidConfig
+    gemini: GeminiConfig = field(default_factory=GeminiConfig)
+    obsidian: ObsidianConfig = field(default_factory=ObsidianConfig)
     project_root: Path = field(default_factory=Path)
 
     def get_enabled_wallets(self) -> list[WalletConfig]:
@@ -180,6 +196,22 @@ def load_config(config_path: Optional[str] = None, env_path: Optional[str] = Non
         max_reconnect_delay=hl_data.get("max_reconnect_delay", 300),
     )
 
+    # Parse Gemini config
+    gemini_data = data.get("gemini", {})
+    gemini = GeminiConfig(
+        api_key=os.getenv("GEMINI_API_KEY", ""),
+        model=gemini_data.get("model", "gemini-2.0-flash"),
+        enabled=gemini_data.get("enabled", True),
+    )
+
+    # Parse Obsidian config
+    obsidian_data = data.get("obsidian", {})
+    obsidian = ObsidianConfig(
+        vault_path=obsidian_data.get("vault_path", ""),
+        notes_folder=obsidian_data.get("notes_folder", "Trading"),
+        enabled=obsidian_data.get("enabled", True),
+    )
+
     return Config(
         wallets=wallets,
         smtp=smtp,
@@ -189,5 +221,7 @@ def load_config(config_path: Optional[str] = None, env_path: Optional[str] = Non
         database=database,
         logging=logging_config,
         hyperliquid=hyperliquid,
+        gemini=gemini,
+        obsidian=obsidian,
         project_root=project_root,
     )

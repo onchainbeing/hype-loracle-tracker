@@ -4,7 +4,9 @@ import asyncio
 import logging
 import signal
 import sys
+from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from tracker.core.config import Config, load_config
 from tracker.core.models import Fill, PositionChange
@@ -13,6 +15,8 @@ from tracker.services.websocket import WebSocketManager
 from tracker.services.tracker import PositionTracker
 from tracker.services.email import EmailService
 from tracker.services.scheduler import Scheduler
+from tracker.services.analyst import GeminiAnalyst
+from tracker.services.obsidian import ObsidianWriter
 from tracker.persistence.database import Database
 
 logger = logging.getLogger(__name__)
@@ -34,6 +38,8 @@ class Application:
         self.database = Database(config.get_db_path())
         self.email_service = EmailService(config)
         self.scheduler = Scheduler(config.notifications.timezone)
+        self.analyst = GeminiAnalyst(config.gemini)
+        self.writer = ObsidianWriter(config.obsidian)
 
         # Tracker will be initialized after database
         self.tracker: PositionTracker = None
@@ -64,12 +70,25 @@ class Application:
             )
             logger.info(f"Subscribed to fills for {wallet.name}")
 
+        # Initialize Gemini analyst and Obsidian writer
+        self.analyst.initialize()
+        self.writer.initialize()
+
         # Start daily summary scheduler
         self.scheduler.start_daily_task(
             target_time=self.config.notifications.daily_summary_time,
             callback=self._send_daily_summary,
             name="daily_summary",
         )
+
+        # Start Obsidian note generation scheduler at 20:00
+        if self.config.gemini.enabled and self.config.obsidian.enabled:
+            self.scheduler.start_daily_task(
+                target_time="20:00",
+                callback=self._generate_obsidian_notes,
+                name="obsidian_notes",
+            )
+            logger.info("Obsidian note generation scheduled at 20:00")
 
         # Start WebSocket connection
         ws_task = asyncio.create_task(self.ws_manager.run())
@@ -118,6 +137,51 @@ class Application:
             await self.email_service.send_daily_summary(positions, wallet_names)
         except Exception as e:
             logger.error(f"Failed to send daily summary: {e}")
+
+    async def _generate_obsidian_notes(self) -> None:
+        """Generate daily Obsidian trading analysis notes for all wallets."""
+        tz = ZoneInfo(self.config.notifications.timezone)
+        today = datetime.now(tz).date()
+        since = datetime.combine(today, datetime.min.time())
+
+        logger.info("Generating Obsidian trading notes...")
+
+        for wallet in self.config.get_enabled_wallets():
+            try:
+                # Get current positions from tracker memory
+                positions = self.tracker.get_positions(wallet.address)
+                positions_data = [p.to_dict() for p in positions]
+
+                # Get today's fills from database
+                fills = await self.database.get_fills(
+                    wallet_address=wallet.address,
+                    since=since,
+                    limit=500,
+                )
+
+                # Get today's position changes from database
+                position_changes = await self.database.get_position_changes(
+                    wallet_address=wallet.address,
+                    since=since,
+                    limit=500,
+                )
+
+                # Generate analysis via Gemini
+                analysis = await self.analyst.analyze(
+                    wallet_name=wallet.name,
+                    positions=positions_data,
+                    fills=fills,
+                    position_changes=position_changes,
+                )
+
+                if analysis:
+                    self.writer.append_analysis(wallet.name, today, analysis)
+                    logger.info(f"Obsidian note generated for {wallet.name}")
+                else:
+                    logger.warning(f"No analysis generated for {wallet.name}")
+
+            except Exception as e:
+                logger.error(f"Failed to generate note for {wallet.name}: {e}")
 
     async def _cleanup(self) -> None:
         """Cleanup resources."""
