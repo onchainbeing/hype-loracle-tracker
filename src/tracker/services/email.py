@@ -278,6 +278,23 @@ class EmailService:
 
         return await self.send_email(subject, html_body, text_body)
 
+    def _format_position_details_markdown(self, pos: Position) -> str:
+        """Format position details as Markdown list (PushPlus doesn't support tables)."""
+        upnl = pos.unrealized_pnl
+        upnl_str = f"+${upnl:.2f}" if upnl >= 0 else f"-${abs(upnl):.2f}"
+        liq_str = f"${pos.liquidation_price:.2f}" if pos.liquidation_price else "N/A"
+
+        return "\n".join([
+            "",
+            "📊 **当前仓位**",
+            f"- Symbol: **{pos.coin}**",
+            f"- uPnL: **{upnl_str}**",
+            f"- Entry Price: **${pos.entry_price:.2f}**",
+            f"- Liq. Price: **{liq_str}**",
+            f"- Margin: **${pos.margin_used:.2f}**",
+            "",
+        ])
+
     def _format_position_change_markdown(self, change: PositionChange) -> str:
         """Format position change as Markdown for PushPlus WeChat notification."""
         emoji_map = {
@@ -308,6 +325,10 @@ class EmailService:
             pnl_str = f"+${pnl:.2f}" if pnl >= 0 else f"-${abs(pnl):.2f}"
             lines.append(f"**已实现盈亏**: {pnl_str}")
 
+        # Add current position details
+        if change.current_position:
+            lines.append(self._format_position_details_markdown(change.current_position))
+
         # Add trade details
         if change.fill:
             fill = change.fill
@@ -321,6 +342,38 @@ class EmailService:
             ])
 
         return "\n".join(lines)
+
+    def _format_position_details_html(self, pos: Position) -> str:
+        """Format position details as HTML table."""
+        upnl = pos.unrealized_pnl
+        upnl_color = "#22c55e" if upnl >= 0 else "#ef4444"
+        upnl_str = f"+${upnl:.2f}" if upnl >= 0 else f"-${abs(upnl):.2f}"
+        liq_str = f"${pos.liquidation_price:.2f}" if pos.liquidation_price else "N/A"
+
+        return f"""
+                    <div style="background: #e5e7eb; padding: 15px; border-radius: 8px; margin-top: 15px;">
+                        <h4 style="margin: 0 0 10px 0; color: #374151;">📊 Current Position</h4>
+                        <div class="info-row">
+                            <span class="label">Symbol</span>
+                            <span class="value">{pos.coin}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="label">uPnL</span>
+                            <span class="value" style="color: {upnl_color};">{upnl_str}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="label">Entry Price</span>
+                            <span class="value">${pos.entry_price:.2f}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="label">Liq. Price</span>
+                            <span class="value">{liq_str}</span>
+                        </div>
+                        <div class="info-row" style="border-bottom: none;">
+                            <span class="label">Margin</span>
+                            <span class="value">${pos.margin_used:.2f}</span>
+                        </div>
+                    </div>"""
 
     def _format_position_change_html(self, change: PositionChange) -> str:
         """Format position change as HTML email."""
@@ -343,6 +396,11 @@ class EmailService:
                         <span class="label">Realized PnL</span>
                         <span class="value" style="color: {pnl_color};">{pnl_str}</span>
                     </div>"""
+
+        # Current position details
+        position_html = ""
+        if change.current_position:
+            position_html = self._format_position_details_html(change.current_position)
 
         # Fill/Trade details section
         fill_html = ""
@@ -419,6 +477,7 @@ class EmailService:
                         <span class="value">${change.new_entry_price:.2f}</span>
                     </div>
                     {pnl_html}
+                    {position_html}
                     {fill_html}
                     <p style="color: #9ca3af; font-size: 12px; margin-top: 20px;">
                         {change.timestamp.strftime('%Y-%m-%d %H:%M:%S UTC')}
@@ -449,6 +508,7 @@ class EmailService:
                     side_color = "#22c55e" if pos.size > 0 else "#ef4444"
                     pnl_color = "#22c55e" if pos.unrealized_pnl >= 0 else "#ef4444"
                     pnl_str = f"+${pos.unrealized_pnl:.2f}" if pos.unrealized_pnl >= 0 else f"-${abs(pos.unrealized_pnl):.2f}"
+                    liq_str = f"${pos.liquidation_price:.2f}" if pos.liquidation_price else "N/A"
 
                     positions_html += f"""
                     <div style="background: white; padding: 15px; border-radius: 8px; margin-bottom: 10px;">
@@ -461,6 +521,9 @@ class EmailService:
                         </div>
                         <div style="margin-top: 10px; color: #6b7280; font-size: 14px;">
                             Size: {abs(pos.size):.4f} | Entry: ${pos.entry_price:.2f} | Leverage: {pos.leverage}x
+                        </div>
+                        <div style="margin-top: 6px; color: #6b7280; font-size: 14px;">
+                            Liq. Price: {liq_str} | Margin: ${pos.margin_used:.2f}
                         </div>
                     </div>
                     """
@@ -518,11 +581,16 @@ class EmailService:
             else:
                 for pos in positions:
                     pnl_str = f"+${pos.unrealized_pnl:.2f}" if pos.unrealized_pnl >= 0 else f"-${abs(pos.unrealized_pnl):.2f}"
+                    liq_str = f"${pos.liquidation_price:.2f}" if pos.liquidation_price else "N/A"
                     lines.append(
                         f"  {pos.coin} {pos.side.upper()} | "
                         f"Size: {abs(pos.size):.4f} | "
                         f"Entry: ${pos.entry_price:.2f} | "
-                        f"PnL: {pnl_str}"
+                        f"uPnL: {pnl_str}"
+                    )
+                    lines.append(
+                        f"    Liq. Price: {liq_str} | "
+                        f"Margin: ${pos.margin_used:.2f}"
                     )
 
             lines.append("")
@@ -558,6 +626,10 @@ class EmailService:
                     f"- {emoji} **{change.change_type.value.upper()}** {change.coin} "
                     f"({direction}) {old_size:.2f} → {new_size:.2f}"
                 )
+
+                # Add current position details
+                if change.current_position:
+                    lines.append(self._format_position_details_markdown(change.current_position))
 
             lines.append("")
 
@@ -626,6 +698,26 @@ class EmailService:
                     pnl_str = f"+${pnl:.2f}" if pnl >= 0 else f"-${abs(pnl):.2f}"
                     pnl_html = f' <span style="color: {pnl_color};">({pnl_str})</span>'
 
+                # Current position details
+                position_html = ""
+                if change.current_position:
+                    pos = change.current_position
+                    upnl = pos.unrealized_pnl
+                    upnl_color = "#22c55e" if upnl >= 0 else "#ef4444"
+                    upnl_str = f"+${upnl:.2f}" if upnl >= 0 else f"-${abs(upnl):.2f}"
+                    liq_str = f"${pos.liquidation_price:.2f}" if pos.liquidation_price else "N/A"
+                    position_html = f"""
+                    <div style="margin-top: 8px; padding: 10px; background: #f3f4f6; border-radius: 4px; font-size: 12px;">
+                        <div style="font-weight: 600; margin-bottom: 6px; color: #374151;">📊 Current Position</div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; color: #6b7280;">
+                            <span>uPnL: <span style="color: {upnl_color};">{upnl_str}</span></span>
+                            <span>Entry: ${pos.entry_price:.2f}</span>
+                            <span>Liq: {liq_str}</span>
+                            <span>Margin: ${pos.margin_used:.2f}</span>
+                        </div>
+                    </div>
+                    """
+
                 changes_html += f"""
                 <div style="background: white; padding: 12px; border-radius: 6px; margin-bottom: 8px; border-left: 4px solid {color};">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -638,6 +730,7 @@ class EmailService:
                     <div style="margin-top: 6px; color: #6b7280; font-size: 13px;">
                         Size: {old_size:.4f} → {new_size:.4f}{pnl_html}
                     </div>
+                    {position_html}
                 </div>
                 """
 

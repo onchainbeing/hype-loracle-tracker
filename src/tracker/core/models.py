@@ -139,6 +139,7 @@ class PositionChange:
     new_entry_price: float
     fill: Optional[Fill] = None
     timestamp: datetime = field(default_factory=datetime.utcnow)
+    current_position: Optional["Position"] = None  # 变动后的完整仓位信息
 
     @property
     def size_change(self) -> float:

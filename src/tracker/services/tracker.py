@@ -124,6 +124,7 @@ class PositionTracker:
             old_entry_price=old_entry_price,
             new_entry_price=new_entry_price,
             fill=fill,
+            current_position=new_position,
         )
 
         logger.info(f"Position change detected: {change.format_message()}")
@@ -214,6 +215,7 @@ class PositionTracker:
                             new_size=new_size,
                             old_entry_price=old_pos.entry_price if old_pos else 0,
                             new_entry_price=new_pos.entry_price if new_pos else 0,
+                            current_position=new_pos,
                         )
                         changes.append(change)
 
