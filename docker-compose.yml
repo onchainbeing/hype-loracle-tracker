@@ -1,0 +1,16 @@
+services:
+  tracker:
+    build: .
+    container_name: hype-tracker
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./config/config.yaml:/app/config/config.yaml:ro
+      - ./obsidian:/app/obsidian
+    deploy:
+      resources:
+        limits:
+          memory: 512M
