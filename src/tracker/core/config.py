@@ -69,7 +69,7 @@ class HyperliquidConfig:
 @dataclass
 class GeminiConfig:
     api_key: str = ""
-    model: str = "gemini-2.0-flash"
+    model: str = "gemini-3-pro-preview"
     enabled: bool = True
 
 
@@ -113,6 +113,9 @@ def load_config(config_path: Optional[str] = None, env_path: Optional[str] = Non
     if config_path:
         project_root = Path(config_path).parent.parent
         config_file = Path(config_path)
+    elif os.getenv("TRACKER_CONFIG"):
+        config_file = Path(os.environ["TRACKER_CONFIG"])
+        project_root = config_file.parent.parent
     else:
         project_root = Path(__file__).parent.parent.parent.parent
         config_file = project_root / "config" / "config.yaml"
@@ -200,14 +203,14 @@ def load_config(config_path: Optional[str] = None, env_path: Optional[str] = Non
     gemini_data = data.get("gemini", {})
     gemini = GeminiConfig(
         api_key=os.getenv("GEMINI_API_KEY", ""),
-        model=gemini_data.get("model", "gemini-2.0-flash"),
+        model=gemini_data.get("model", "gemini-3-pro-preview"),
         enabled=gemini_data.get("enabled", True),
     )
 
     # Parse Obsidian config
     obsidian_data = data.get("obsidian", {})
     obsidian = ObsidianConfig(
-        vault_path=obsidian_data.get("vault_path", ""),
+        vault_path=os.getenv("OBSIDIAN_VAULT_PATH", obsidian_data.get("vault_path", "")),
         notes_folder=obsidian_data.get("notes_folder", "Trading"),
         enabled=obsidian_data.get("enabled", True),
     )
