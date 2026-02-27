@@ -37,9 +37,16 @@ class HyperliquidClient:
             response.raise_for_status()
             return await response.json()
 
-    async def get_clearinghouse_state(self, address: str) -> dict:
+    async def get_clearinghouse_state(
+        self, address: str, dex: str = ""
+    ) -> dict:
         """
         Get current positions and account state for an address.
+
+        Args:
+            address: Wallet address
+            dex: Perp dex name for HIP-3 builder-deployed markets.
+                 Empty string for the default perp dex.
 
         Returns:
             dict with 'assetPositions' and 'marginSummary'
@@ -48,18 +55,30 @@ class HyperliquidClient:
             "type": "clearinghouseState",
             "user": address.lower(),
         }
+        if dex:
+            data["dex"] = dex
         result = await self._post("/info", data)
-        logger.debug(f"Clearinghouse state for {address[:10]}...: {len(result.get('assetPositions', []))} positions")
+        logger.debug(
+            f"Clearinghouse state for {address[:10]}... "
+            f"(dex={dex!r}): "
+            f"{len(result.get('assetPositions', []))} positions"
+        )
         return result
 
-    async def get_positions(self, address: str) -> list[Position]:
+    async def get_positions(
+        self, address: str, dex: str = ""
+    ) -> list[Position]:
         """
         Get current open positions for an address.
+
+        Args:
+            address: Wallet address
+            dex: Perp dex name for HIP-3 builder-deployed markets.
 
         Returns:
             List of Position objects
         """
-        state = await self.get_clearinghouse_state(address)
+        state = await self.get_clearinghouse_state(address, dex=dex)
         positions = []
 
         for asset_pos in state.get("assetPositions", []):

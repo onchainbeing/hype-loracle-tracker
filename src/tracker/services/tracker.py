@@ -11,6 +11,13 @@ from tracker.services.hyperliquid import HyperliquidClient
 logger = logging.getLogger(__name__)
 
 
+def _dex_from_coin(coin: str) -> str:
+    """Extract dex name from coin. E.g. 'xyz:NVDA' -> 'xyz', 'BTC' -> ''."""
+    if ":" in coin:
+        return coin.split(":", 1)[0]
+    return ""
+
+
 class PositionTracker:
     """Tracks positions for multiple wallets and detects changes."""
 
@@ -28,6 +35,9 @@ class PositionTracker:
         # {address: {coin: Position}}
         self._positions: dict[str, dict[str, Position]] = {}
 
+        # Track known dex names (e.g. "xyz") so we can fetch all on init/sync
+        self._known_dexes: set[str] = set()
+
         # Wallet config lookup by address
         self._wallet_map: dict[str, WalletConfig] = {
             w.address.lower(): w for w in config.get_enabled_wallets()
@@ -37,19 +47,50 @@ class PositionTracker:
         """Load initial positions for all tracked wallets."""
         logger.info("Initializing position tracker...")
 
+        # Discover known dexes from recent fills
+        await self._discover_dexes()
+
         for wallet in self.config.get_enabled_wallets():
+            address = wallet.address.lower()
+            self._positions[address] = {}
             try:
-                positions = await self.client.get_positions(wallet.address)
-                self._positions[wallet.address.lower()] = {
-                    p.coin: p for p in positions
-                }
+                # Fetch positions from default dex and all known builder dexes
+                dexes_to_check = [""] + list(self._known_dexes)
+                for dex in dexes_to_check:
+                    positions = await self.client.get_positions(
+                        wallet.address, dex=dex
+                    )
+                    for p in positions:
+                        self._positions[address][p.coin] = p
+
                 logger.info(
-                    f"Loaded {len(positions)} positions for {wallet.name} "
-                    f"({wallet.address[:10]}...)"
+                    f"Loaded {len(self._positions[address])} positions "
+                    f"for {wallet.name} ({wallet.address[:10]}...)"
+                    f" (dexes: default"
+                    f"{', ' + ', '.join(self._known_dexes) if self._known_dexes else ''})"
                 )
             except Exception as e:
-                logger.error(f"Failed to load positions for {wallet.name}: {e}")
-                self._positions[wallet.address.lower()] = {}
+                logger.error(
+                    f"Failed to load positions for {wallet.name}: {e}"
+                )
+
+    async def _discover_dexes(self) -> None:
+        """Discover builder dex names from recent fills."""
+        for wallet in self.config.get_enabled_wallets():
+            try:
+                fills = await self.client.get_user_fills(
+                    wallet.address, limit=100
+                )
+                for fill in fills:
+                    dex = _dex_from_coin(fill.coin)
+                    if dex:
+                        self._known_dexes.add(dex)
+            except Exception as e:
+                logger.warning(
+                    f"Failed to discover dexes for {wallet.name}: {e}"
+                )
+        if self._known_dexes:
+            logger.info(f"Discovered builder dexes: {self._known_dexes}")
 
     def get_positions(self, address: str) -> list[Position]:
         """Get current positions for an address."""
@@ -89,13 +130,25 @@ class PositionTracker:
         old_size = current.size if current else 0
         old_entry_price = current.entry_price if current else 0
 
-        # Fetch updated position from API
+        # Determine which dex this coin belongs to
+        dex = _dex_from_coin(fill.coin)
+        if dex:
+            self._known_dexes.add(dex)
+
+        # Fetch updated position from the correct dex
         try:
-            positions = await self.client.get_positions(address)
+            positions = await self.client.get_positions(address, dex=dex)
             position_map = {p.coin: p for p in positions}
 
-            # Update stored positions
-            self._positions[address] = position_map
+            # Merge into stored positions (only update coins from this dex)
+            if address not in self._positions:
+                self._positions[address] = {}
+            for coin, pos in position_map.items():
+                self._positions[address][coin] = pos
+            # Remove coins from this dex that are no longer in the response
+            for coin in list(self._positions[address]):
+                if _dex_from_coin(coin) == dex and coin not in position_map:
+                    del self._positions[address][coin]
 
             # Get new position state
             new_position = position_map.get(fill.coin)
@@ -189,9 +242,15 @@ class PositionTracker:
                 address = wallet.address.lower()
                 old_positions = self._positions.get(address, {})
 
-                # Fetch current positions
-                new_positions_list = await self.client.get_positions(wallet.address)
-                new_positions = {p.coin: p for p in new_positions_list}
+                # Fetch positions from default dex and all known builder dexes
+                new_positions: dict[str, Position] = {}
+                dexes_to_check = [""] + list(self._known_dexes)
+                for dex in dexes_to_check:
+                    positions_list = await self.client.get_positions(
+                        wallet.address, dex=dex
+                    )
+                    for p in positions_list:
+                        new_positions[p.coin] = p
 
                 # Check for changes
                 all_coins = set(old_positions.keys()) | set(new_positions.keys())
